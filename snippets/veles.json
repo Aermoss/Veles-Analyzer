@@ -1,0 +1,81 @@
+{
+    "Module": {
+        "prefix": "module",
+        "body": [
+            "module ${1:Name}(",
+            "\tclk: in clock,",
+            "\trst: in reset,",
+            "\t${2:value}: in ${3:u8},",
+            "\t${4:result}: out ${5:u8}",
+            ") {",
+            "\t$0",
+            "}"
+        ],
+        "description": "Module with a clock and reset"
+    },
+    "Extern module": {
+        "prefix": "extern",
+        "body": ["extern module ${1:Name}(${2:clk: in clock});"],
+        "description": "Existing SystemVerilog module or vendor primitive"
+    },
+    "Enum": {
+        "prefix": "enum",
+        "body": ["enum ${1:State} { ${2:Idle}, ${3:Busy} }"],
+        "description": "Enumeration"
+    },
+    "Seq block": {
+        "prefix": "seq",
+        "body": ["seq {", "\t$0", "}"],
+        "description": "Sequential block using the default clock and reset"
+    },
+    "Seq block with clock": {
+        "prefix": "seqclk",
+        "body": ["seq(${1:clk}${2:, ${3:rst}}) {", "\t$0", "}"],
+        "description": "Sequential block with an explicit clock and reset"
+    },
+    "Comb block": {
+        "prefix": "comb",
+        "body": ["comb {", "\t$0", "}"],
+        "description": "Combinational block"
+    },
+    "Match": {
+        "prefix": "match",
+        "body": ["match ${1:value} {", "\t${2:pattern} => {", "\t\t$0", "\t},", "\t_ => {}", "}"],
+        "description": "Match statement"
+    },
+    "If": {
+        "prefix": "if",
+        "body": ["if ${1:condition} {", "\t$0", "}"],
+        "description": "If statement"
+    },
+    "If else": {
+        "prefix": "ifelse",
+        "body": ["if ${1:condition} {", "\t$2", "} else {", "\t$0", "}"],
+        "description": "If statement with an else branch"
+    },
+    "Register": {
+        "prefix": "reg",
+        "body": ["reg ${1:name}: ${2:u8} = ${3:0};"],
+        "description": "Register with a reset value"
+    },
+    "Wire": {
+        "prefix": "wire",
+        "body": ["wire ${1:name}: ${2:u8};"],
+        "description": "Combinational signal driven separately"
+    },
+    "Let": {
+        "prefix": "let",
+        "body": ["let ${1:name} = ${0:value};"],
+        "description": "Named combinational value"
+    },
+    "Instance": {
+        "prefix": "inst",
+        "body": ["let ${1:instance} = ${2:Module} {", "\t$0", "};"],
+        "description": "Module instance"
+    },
+    "Include": {
+        "prefix": "include",
+        "body": ["#[include \"${1:File}.vel\"]"],
+        "description": "Include another Veles file"
+    }
+}

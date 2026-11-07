@@ -1,0 +1,102 @@
+{
+    "name": "veles-analyzer",
+    "displayName": "Veles Analyzer",
+    "description": "Veles language support for Visual Studio Code.",
+    "publisher": "bithynia",
+    "version": "0.1.1",
+    "engines": {
+        "vscode": "^1.103.0"
+    },
+    "categories": [
+        "Programming Languages",
+        "Snippets"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Aermoss/Veles-Analyzer"
+    },
+    "scripts": {
+        "compile": "tsc -p ./",
+        "watch": "tsc --watch -p ./",
+        "vscode:prepublish": "npm run compile"
+    },
+    "contributes": {
+        "configuration": {
+            "title": "Veles",
+            "properties": {
+                "veles.compilerPath": {
+                    "type": "string",
+                    "default": "",
+                    "scope": "resource",
+                    "description": "Path to the velesc compiler executable. If empty, velesc is searched on the system PATH, in bin/ of the workspace folder and in ../Veles/bin/ next to it."
+                },
+                "veles.includePaths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "scope": "resource",
+                    "description": "Additional include directories passed to velesc with -I. Relative paths are resolved against the workspace folder."
+                }
+            }
+        },
+        "languages": [
+            {
+                "id": "veles",
+                "aliases": [
+                    "Veles"
+                ],
+                "extensions": [
+                    ".vel"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "veles",
+                "scopeName": "source.veles",
+                "path": "./syntaxes/veles.tmLanguage.json"
+            }
+        ],
+        "snippets": [
+            {
+                "language": "veles",
+                "path": "./snippets/veles.json"
+            }
+        ],
+        "commands": [
+            {
+                "command": "veles.compileToSystemVerilog",
+                "title": "Compile to SystemVerilog",
+                "category": "Veles",
+                "icon": "$(file-code)"
+            }
+        ],
+        "menus": {
+            "editor/title": [
+                {
+                    "command": "veles.compileToSystemVerilog",
+                    "when": "editorLangId == veles",
+                    "group": "navigation"
+                }
+            ],
+            "commandPalette": [
+                {
+                    "command": "veles.compileToSystemVerilog",
+                    "when": "editorLangId == veles"
+                }
+            ]
+        }
+    },
+    "main": "./out/extension.js",
+    "activationEvents": [
+        "onLanguage:veles"
+    ],
+    "devDependencies": {
+        "@types/node": "^26.6.5",
+        "@types/vscode": "^1.103.0",
+        "typescript": "^7.0.2"
+    }
+}
