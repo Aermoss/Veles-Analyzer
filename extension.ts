@@ -19,11 +19,13 @@ const KEYWORD_DOCS: Record<string, string> = {
     let: "Declares a named combinational value. A `let` whose value is `Module { ... }` declares an instance.",
     wire: "Declares a combinational signal that is driven separately, by a `comb` block or a continuous assignment.",
     reg: "Declares a register. Its initial value becomes the reset value. Registers are assigned in `seq` blocks with `<-`.",
-    in: "Input port.",
+    in: "Input port. Also separates the variable from the range in `for i in 0..N`.",
     out: "Output port. `out reg` declares a registered output.",
+    inout: "Bidirectional port. It can only be connected to an `inout` port of an instance.",
     seq: "Sequential block, emitted as `always_ff`. Uses the module's first clock and reset unless `seq(clk)` or `seq(clk, rst)` is given. Assign with `<-`.",
     comb: "Combinational block, emitted as `always_comb`. Assign with `=`; every signal it drives must be assigned on every path.",
-    if: "Conditional statement or expression. The condition must be a `bool`.",
+    if: "Conditional statement or expression. The condition must be a `bool`. When it is a constant, only the chosen branch is checked and emitted. At module level `if CONSTANT { ... }` keeps only the items of the chosen branch.",
+    for: "Repeats its body for each value of a constant range, `for i in 0..N { ... }`. Inside `comb` and `seq` blocks it repeats statements. At module level it repeats items: every signal or instance declared inside becomes an array, the current element inside the loop and `name[k]` everywhere, emitted as `name_k`.",
     else: "Alternative branch of an `if`.",
     match: "Compares a value against constant patterns; emitted as a `case` statement. `_` matches anything.",
     as: "Cast: truncates, zero-extends, sign-extends or reinterprets a value, for example `x as u16`.",
@@ -68,6 +70,7 @@ interface Declaration {
     documentation?: string;
     container?: Declaration;
     external?: boolean;
+    parameters?: string[];
     input?: boolean;
     module?: string;
     children: Declaration[];
@@ -180,7 +183,7 @@ function indexSource(uri: vscode.Uri, source: string): FileIndex {
     const moduleAt = (offset: number): Declaration | undefined =>
         modules.find(module => !module.external && offset > module.start && offset < module.end);
 
-    const modulePattern = new RegExp(`\\b(extern\\s+)?module\\s+(${IDENTIFIER})\\s*\\(`, "g");
+    const modulePattern = new RegExp(`\\b(extern\\s+)?module\\s+(${IDENTIFIER})\\s*(?:<([^>]*)>\\s*)?\\(`, "g");
     let match: RegExpExecArray | null;
 
     while ((match = modulePattern.exec(code)) !== null) {
@@ -204,22 +207,23 @@ function indexSource(uri: vscode.Uri, source: string): FileIndex {
 
         const module = make("module", match[2], nameStart, match.index, end, "");
         module.external = external;
+        module.parameters = match[3] ? match[3].split(",").map(parameter => parameter.trim()).filter(parameter => parameter.length > 0) : [];
         module.documentation = documentationAbove(source, match.index);
         const portTexts: string[] = [];
 
         for (const part of splitTopLevel(code, open + 1, close)) {
             const text = code.slice(part.start, part.end);
-            const port = new RegExp(`^\\s*(${IDENTIFIER})\\s*:\\s*(in|out)\\b`).exec(text);
+            const port = new RegExp(`^\\s*(${IDENTIFIER})\\s*:\\s*(inout|in|out)\\b`).exec(text);
             if (!port) continue;
             const portStart = part.start + text.indexOf(port[1]);
             const declaration = make("port", port[1], portStart, portStart, part.end, collapse(text));
-            declaration.input = port[2] === "in";
+            declaration.input = port[2] !== "out";
             declaration.container = module;
             module.children.push(declaration);
             portTexts.push(declaration.text);
         }
 
-        const header = `${external ? "extern " : ""}module ${match[2]}`;
+        const header = `${external ? "extern " : ""}module ${match[2]}${module.parameters.length ? `<${module.parameters.join(", ")}>` : ""}`;
         module.text = portTexts.length ? `${header}(\n    ${portTexts.join(",\n    ")}\n)` : `${header}()`;
         modules.push(module);
         declarations.push(module);
@@ -272,7 +276,7 @@ function indexSource(uri: vscode.Uri, source: string): FileIndex {
         declaration.container = moduleAt(match.index);
 
         if (kind === "let") {
-            const instance = new RegExp(`^\\s*=\\s*(${IDENTIFIER})\\s*\\{`).exec(code.slice(namedPattern.lastIndex, end));
+            const instance = new RegExp(`^\\s*=\\s*(${IDENTIFIER})\\s*(?:<[^>]*>\\s*)?\\{`).exec(code.slice(namedPattern.lastIndex, end));
 
             if (instance && instance[1] !== "if") {
                 kind = "instance";
@@ -541,7 +545,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }
 
     function memberPrefix(context: Context): string | undefined {
-        return new RegExp(`(${IDENTIFIER})\\s*\\.\\s*$`).exec(context.code.slice(0, context.offset))?.[1];
+        return new RegExp(`(${IDENTIFIER})\\s*(?:\\[[^\\[\\]]*\\]\\s*)*\\.\\s*$`).exec(context.code.slice(0, context.offset))?.[1];
     }
 
     function instanceLiteral(context: Context): Declaration | undefined {
@@ -561,12 +565,18 @@ export function activate(context: vscode.ExtensionContext): void {
                     continue;
                 }
 
-                const name = new RegExp(`=\\s*(${IDENTIFIER})\\s*$`).exec(context.code.slice(0, i))?.[1];
+                const name = new RegExp(`=\\s*(${IDENTIFIER})\\s*(?:<[^>]*>\\s*)?$`).exec(context.code.slice(0, i))?.[1];
                 return name ? findModule(context.indexes, name) : undefined;
             }
         }
 
         return undefined;
+    }
+
+    function parameterList(context: Context): Declaration | undefined {
+        const match = new RegExp(`=\\s*(${IDENTIFIER})\\s*<[^<>{};]*$`).exec(context.code.slice(0, context.offset));
+        if (!match || !/[<,]\s*$/.test(context.code.slice(0, context.offset))) return undefined;
+        return findModule(context.indexes, match[1]);
     }
 
     function instanceModule(context: Context, name: string): Declaration | undefined {
@@ -679,9 +689,11 @@ export function activate(context: vscode.ExtensionContext): void {
     }
 
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider(selector, {
-        async provideCompletionItems(document, position) {
+        async provideCompletionItems(document, position, token, completion) {
             const context = await contextAt(document, position);
             if (!context) return undefined;
+            const parameterModule = parameterList(context);
+            if ((completion.triggerCharacter === "<" || completion.triggerCharacter === ",") && !parameterModule && !instanceLiteral(context)) return undefined;
             const enumName = enumPrefix(context);
 
             if (enumName) {
@@ -694,6 +706,16 @@ export function activate(context: vscode.ExtensionContext): void {
             if (instanceName) {
                 const module = instanceModule(context, instanceName);
                 return module?.children.filter(port => port.kind === "port" && !port.input).map((port, index) => declarationItem(port, `0_${String(index).padStart(4, "0")}`)) || [];
+            }
+
+            if (parameterModule) {
+                return (parameterModule.parameters || []).map((parameter, index) => {
+                    const item = new vscode.CompletionItem(parameter, vscode.CompletionItemKind.TypeParameter);
+                    item.detail = `parameter of ${parameterModule.name}`;
+                    item.insertText = new vscode.SnippetString(`${parameter}: $0`);
+                    item.sortText = `0_${String(index).padStart(4, "0")}`;
+                    return item;
+                });
             }
 
             const literal = instanceLiteral(context);
@@ -743,7 +765,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
             return items;
         }
-    }, ".", ":"));
+    }, ".", ":", "<", ","));
 
     context.subscriptions.push(vscode.languages.registerSignatureHelpProvider(selector, {
         provideSignatureHelp(document, position) {
@@ -784,7 +806,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 const range = new vscode.Range(document.positionAt(declaration.start), document.positionAt(Math.max(declaration.end, declaration.nameStart + declaration.name.length)));
                 const nameStart = document.positionAt(declaration.nameStart);
                 const selection = new vscode.Range(nameStart, nameStart.translate(0, declaration.name.length));
-                const detail = declaration.kind === "port" ? (declaration.input ? "in" : "out") : declaration.kind === "instance" ? declaration.module || "" : declaration.kind;
+                const detail = declaration.kind === "port" ? (declaration.text.includes("inout") ? "inout" : declaration.input ? "in" : "out") : declaration.kind === "instance" ? declaration.module || "" : declaration.kind;
                 const symbol = new vscode.DocumentSymbol(declaration.name, detail, symbolKind(declaration.kind), range.union(selection), selection);
                 symbol.children = declaration.children.map(toSymbol);
                 return symbol;

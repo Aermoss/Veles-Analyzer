@@ -3,7 +3,7 @@
     "displayName": "Veles Analyzer",
     "description": "Veles language support for Visual Studio Code.",
     "publisher": "bithynia",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "engines": {
         "vscode": "^1.103.0"
     },

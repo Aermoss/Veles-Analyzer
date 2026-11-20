@@ -7,6 +7,7 @@
         { "include": "#strings" },
         { "include": "#preprocessor" },
         { "include": "#declarations" },
+        { "include": "#loops" },
         { "include": "#ports" },
         { "include": "#paths" },
         { "include": "#annotations" },
@@ -44,7 +45,11 @@
                     },
                     "patterns": [
                         { "include": "#comments" },
-                        { "name": "keyword.control.directive.veles", "match": "\\binclude\\b" },
+                        { "name": "keyword.control.directive.veles", "match": "\\b(include|if)\\b" },
+                        { "include": "#types" },
+                        { "include": "#constants" },
+                        { "include": "#operators" },
+                        { "include": "#numbers" },
                         { "include": "#strings" },
                         { "name": "keyword.operator.wildcard.veles", "match": "\\*" },
                         { "name": "punctuation.separator.veles", "match": "[:,]" }
@@ -87,10 +92,22 @@
                 }
             ]
         },
+        "loops": {
+            "patterns": [
+                {
+                    "match": "\\b(for)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(in)\\b",
+                    "captures": {
+                        "1": { "name": "keyword.control.flow.veles" },
+                        "2": { "name": "variable.other.loop.veles" },
+                        "3": { "name": "keyword.control.flow.veles" }
+                    }
+                }
+            ]
+        },
         "ports": {
             "patterns": [
                 {
-                    "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(:)\\s*(in|out)\\b(?:\\s+(reg)\\b)?(?:\\s+([A-Z][a-z0-9][A-Za-z0-9_]*)\\b)?",
+                    "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(:)\\s*(inout|in|out)\\b(?:\\s+(reg)\\b)?(?:\\s+([A-Z][a-z0-9][A-Za-z0-9_]*)\\b)?",
                     "captures": {
                         "1": { "name": "variable.parameter.port.veles" },
                         "2": { "name": "punctuation.separator.colon.veles" },
@@ -138,10 +155,10 @@
         },
         "keywords": {
             "patterns": [
-                { "name": "keyword.control.flow.veles", "match": "\\b(if|else|match)\\b" },
+                { "name": "keyword.control.flow.veles", "match": "\\b(if|else|match|for)\\b" },
                 { "name": "keyword.control.block.veles", "match": "\\b(seq|comb)\\b" },
                 { "name": "keyword.declaration.veles", "match": "\\b(module|extern|enum|type|const|let|wire|reg)\\b" },
-                { "name": "storage.modifier.direction.veles", "match": "\\b(in|out)\\b" },
+                { "name": "storage.modifier.direction.veles", "match": "\\b(inout|in|out)\\b" },
                 { "name": "keyword.operator.word.veles", "match": "\\bas\\b" }
             ]
         },
@@ -163,6 +180,7 @@
                 { "name": "keyword.operator.logical.veles", "match": "!" },
                 { "name": "keyword.operator.arithmetic.veles", "match": "\\+|-|\\*|/|%" },
                 { "name": "keyword.operator.bitwise.veles", "match": "&|\\||\\^" },
+                { "name": "keyword.operator.range.veles", "match": "\\.\\." },
                 { "name": "punctuation.separator.namespace.veles", "match": "::" },
                 { "name": "punctuation.separator.colon.veles", "match": ":" },
                 { "name": "punctuation.accessor.veles", "match": "\\." }
